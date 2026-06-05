@@ -1,0 +1,201 @@
+// This is your Prisma schema file
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextIndex", "fullTextSearch"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String    @id @default(cuid())
+  clerkId    String    @unique
+  email      String    @unique
+  name       String?
+  plan       String    @default("free")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  products   Product[]
+  categories Category[]
+  queueItems QueueItem[]
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  userId      String
+  name        String
+  slug        String
+  icon        String    @default("📦")
+  color       String    @default("#6366f1")
+  tone        String    @default("professional")
+  promptHint  String?   @db.Text
+  description String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products    Product[]
+  queueItems  QueueItem[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+model Product {
+  id               Int       @id @default(autoincrement())
+  userId           String
+  title            String    @db.VarChar(500)
+  sku              String?   @db.VarChar(100)
+  price            Decimal?  @db.Decimal(10, 2)
+  comparePrice     Decimal?  @db.Decimal(10, 2)
+  costPrice        Decimal?  @db.Decimal(10, 2)
+  vendor           String?
+  categoryId       Int?
+  categoryName     String?
+  type             String?
+  tags             String?   @db.Text
+  description      String?   @db.LongText
+  bulletPoints     String?   @db.Text
+  seoKeywords      String?   @db.Text
+  metaDescription  String?   @db.VarChar(200)
+  imageUrl         String?   @db.Text
+  imageUrl2        String?   @db.Text
+  imageUrl3        String?   @db.Text
+  altText          String?
+  quantity         Int       @default(100)
+  sourceUrl        String?   @db.Text
+  sourceMarketplace String?
+  asin             String?
+  status           String    @default("draft")
+  aiProvider       String?
+  aiModel          String?
+  aiTone           String?
+  seoScore         Int?
+  seoGrade         String?
+  notes            String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         Category? @relation(fields: [categoryId], references: [id])
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, categoryId])
+  // @@fulltext([title, tags, sku]) -- enable after fullTextIndex is enabled in MySQL 8+
+}
+
+model QueueItem {
+  id          Int       @id @default(autoincrement())
+  userId      String
+  productName String    @db.VarChar(500)
+  categoryId  Int?
+  category    String?
+  keywords    String?   @db.Text
+  price       Decimal?  @db.Decimal(10, 2)
+  extraInfo   String?   @db.Text
+  sourceUrl   String?   @db.Text
+  platform    String    @default("shopify")
+  tone        String    @default("professional")
+  status      String    @default("pending")
+  errorMsg    String?   @db.Text
+  resultId    Int?
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cat         Category? @relation(fields: [categoryId], references: [id])
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model ExportHistory {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  platform   String
+  rowCount   Int
+  filename   String
+  createdAt  DateTime @default(now())
+}
+
+// ── Blog ──────────────────────────────────────────────────────────────────────
+model BlogCategory {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  slug      String    @unique
+  icon      String    @default("📝")
+  color     String    @default("#6366f1")
+  postCount Int       @default(0)
+  createdAt DateTime  @default(now())
+  posts     BlogPost[]
+}
+
+model BlogPost {
+  id             Int           @id @default(autoincrement())
+  title          String        @db.VarChar(500)
+  slug           String        @unique @db.VarChar(500)
+  excerpt        String        @db.Text
+  content        String        @db.LongText
+  coverImage     String?       @db.Text
+  categoryId     Int?
+  tags           String?       @db.Text
+  authorName     String        @default("ListingAI Team")
+  authorAvatar   String?
+  status         String        @default("published")
+  featured       Boolean       @default(false)
+  views          Int           @default(0)
+  readTime       Int           @default(5)
+  seoTitle       String?       @db.VarChar(200)
+  seoDescription String?       @db.VarChar(300)
+  publishedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  category       BlogCategory? @relation(fields: [categoryId], references: [id])
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([slug])
+}
+
+// ── Contact Messages ──────────────────────────────────────────────────────────
+model ContactMessage {
+  id         Int       @id @default(autoincrement())
+  name       String
+  email      String
+  subject    String
+  message    String    @db.Text
+  status     String    @default("unread")
+  reply      String?   @db.Text
+  repliedAt  DateTime?
+  repliedBy  String?
+  ip         String?
+  userAgent  String?   @db.Text
+  createdAt  DateTime  @default(now())
+
+  @@index([status])
+}
+
+// ── Site Settings (Super Admin controlled) ────────────────────────────────────
+model SiteSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String   @db.Text
+  type      String   @default("string")
+  group     String   @default("general")
+  label     String
+  updatedAt DateTime @updatedAt
+}
+
+// ── Admin Users ───────────────────────────────────────────────────────────────
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  clerkId      String   @unique
+  email        String   @unique
+  name         String
+  role         String   @default("admin")
+  permissions  String   @db.Text @default("[]")
+  isSuperAdmin Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime @default(now())
+}
