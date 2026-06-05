@@ -1,0 +1,25 @@
+name: Database Migrations
+
+on:
+  workflow_run:
+    workflows: ["CI/CD — ListingAI v4"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  migrate:
+    name: Run Prisma Migrations
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Run migrations (production)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma db push --accept-data-loss
