@@ -16,6 +16,10 @@ export default function HomePage() {
           <span className="font-bold text-lg">ListingAI</span>
           <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full">v4</span>
         </div>
+        <div className="hidden md:flex items-center gap-1 text-sm text-gray-400">
+          <Link href="/blog" className="px-3 py-2 rounded-lg hover:text-white hover:bg-gray-800 transition-colors">Blog</Link>
+          <Link href="/contact" className="px-3 py-2 rounded-lg hover:text-white hover:bg-gray-800 transition-colors">Contact</Link>
+        </div>
         <div className="flex gap-3">
           <Link href="/sign-in" className="text-sm text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">Sign In</Link>
           <Link href="/sign-up" className="text-sm bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg transition-colors font-semibold">Get Started Free</Link>
@@ -118,8 +122,50 @@ export default function HomePage() {
         </Link>
       </section>
 
-      <footer className="border-t border-gray-800 py-8 text-center text-gray-500 text-sm">
-        <p>ListingAI v4 — Built for ecommerce professionals · Next.js 16 + MySQL + Kafka + Socket.io + Docker</p>
+      <footer className="border-t border-gray-800 py-10 text-gray-500 text-sm">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-xs text-white">LA</div>
+                <span className="font-bold text-white text-sm">ListingAI</span>
+              </div>
+              <p className="text-xs leading-relaxed">AI-powered ecommerce listing automation. Free with Groq &amp; Gemini.</p>
+            </div>
+            <div>
+              <div className="font-semibold text-gray-300 text-xs uppercase tracking-wide mb-3">Product</div>
+              <div className="space-y-2">
+                <Link href="/dashboard" className="block hover:text-gray-300 transition-colors">Dashboard</Link>
+                <Link href="/dashboard/products" className="block hover:text-gray-300 transition-colors">Products</Link>
+                <Link href="/dashboard/queue" className="block hover:text-gray-300 transition-colors">Bulk Queue</Link>
+                <Link href="/dashboard/scraper" className="block hover:text-gray-300 transition-colors">Scraper</Link>
+                <Link href="/dashboard/analytics" className="block hover:text-gray-300 transition-colors">Analytics</Link>
+              </div>
+            </div>
+            <div>
+              <div className="font-semibold text-gray-300 text-xs uppercase tracking-wide mb-3">Company</div>
+              <div className="space-y-2">
+                <Link href="/blog" className="block hover:text-gray-300 transition-colors">Blog</Link>
+                <Link href="/contact" className="block hover:text-gray-300 transition-colors">Contact Us</Link>
+                <Link href="/sign-in" className="block hover:text-gray-300 transition-colors">Sign In</Link>
+                <Link href="/sign-up" className="block hover:text-gray-300 transition-colors">Sign Up Free</Link>
+              </div>
+            </div>
+            <div>
+              <div className="font-semibold text-gray-300 text-xs uppercase tracking-wide mb-3">Legal</div>
+              <div className="space-y-2">
+                <Link href="/privacy" className="block hover:text-gray-300 transition-colors">Privacy Policy</Link>
+                <Link href="/terms" className="block hover:text-gray-300 transition-colors">Terms of Service</Link>
+                <Link href="/cookies" className="block hover:text-gray-300 transition-colors">Cookie Policy</Link>
+                <Link href="/acceptable-use" className="block hover:text-gray-300 transition-colors">Acceptable Use</Link>
+                <Link href="/legal" className="block hover:text-gray-300 transition-colors">Legal Hub</Link>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-gray-800 pt-6 text-center">
+            <p>© {new Date().getFullYear()} ListingAI — Built for ecommerce professionals · Next.js 16 + MySQL + Kafka + Socket.io + Docker</p>
+          </div>
+        </div>
       </footer>
     </main>
   )

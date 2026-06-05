@@ -1,9 +1,64 @@
+'use client'
+
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
-export const metadata: Metadata = { title: 'Admin Dashboard', robots: { index: false } }
+// metadata can't be exported from a client component — moved to a separate layout or removed
+// export const metadata: Metadata = { title: 'Admin Dashboard', robots: { index: false } }
+
+type Stats = { users: number; products: number; blog: number; messages: number }
+type Message = { id: number; name: string; email: string; subject: string; status: string; createdAt: string }
 
 export default function AdminPage() {
+  const [stats, setStats] = useState<Stats>({ users: 0, products: 0, blog: 0, messages: 0 })
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [usersRes, contactRes, blogRes, prodRes] = await Promise.allSettled([
+          fetch('/api/admin/users?limit=1'),
+          fetch('/api/contact?status=unread&limit=5'),
+          fetch('/api/blog/posts?limit=1&status=published'),
+          fetch('/api/products?limit=1'),
+        ])
+
+        const parse = async (r: PromiseSettledResult<Response>) => {
+          if (r.status === 'fulfilled' && r.value.ok) {
+            try { return await r.value.json() } catch { return null }
+          }
+          return null
+        }
+
+        const [u, c, b, p] = await Promise.all([
+          parse(usersRes), parse(contactRes), parse(blogRes), parse(prodRes),
+        ])
+
+        setStats({
+          users: u?.total ?? 0,
+          products: p?.total ?? 0,
+          blog: b?.total ?? 0,
+          messages: c?.statusCounts?.unread ?? 0,
+        })
+        setMessages(c?.messages ?? [])
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const statCards = [
+    { label: '👥 Users', value: stats.users, sub: 'Total registered' },
+    { label: '📦 Products', value: stats.products, sub: 'Total in DB' },
+    { label: '📝 Blog Posts', value: stats.blog, sub: 'Published' },
+    { label: '💬 Messages', value: stats.messages, sub: 'Unread' },
+  ]
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
@@ -25,12 +80,14 @@ export default function AdminPage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" id="admin-stats">
-          {[['👥 Users','—','Total registered'],['📦 Products','—','Total in DB'],['📝 Blog Posts','—','Published'],['💬 Messages','—','Unread']].map(([l,v,s]) => (
-            <div key={l as string} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <div className="text-lg font-bold text-white">{l}</div>
-              <div className="text-3xl font-black text-indigo-400 my-1">{v}</div>
-              <div className="text-xs text-gray-500">{s}</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {statCards.map(s => (
+            <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="text-lg font-bold text-white">{s.label}</div>
+              <div className="text-3xl font-black text-indigo-400 my-1">
+                {loading ? <span className="animate-pulse text-gray-600">—</span> : s.value}
+              </div>
+              <div className="text-xs text-gray-500">{s.sub}</div>
             </div>
           ))}
         </div>
@@ -38,12 +95,16 @@ export default function AdminPage() {
         {/* Admin Nav */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
           {[
-            { href:'/admin/users', icon:'👥', title:'User Management', desc:'View, ban, update plans' },
-            { href:'/admin/contact', icon:'💬', title:'Contact Messages', desc:'Read & reply to messages' },
-            { href:'/admin/blog', icon:'📝', title:'Blog Manager', desc:'Create, edit, delete posts' },
-            { href:'/admin/settings', icon:'⚙️', title:'Site Settings', desc:'All platform settings' },
+            { href: '/admin/users', icon: '👥', title: 'User Management', desc: 'View, ban, update plans' },
+            { href: '/admin/contact', icon: '💬', title: 'Contact Messages', desc: 'Read & reply to messages' },
+            { href: '/admin/blog', icon: '📝', title: 'Blog Manager', desc: 'Create, edit, delete posts' },
+            { href: '/admin/settings', icon: '⚙️', title: 'Site Settings', desc: 'All platform settings' },
           ].map(item => (
-            <Link key={item.href} href={item.href} className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-indigo-500/50 transition-colors block">
+            <Link
+              key={item.href}
+              href={item.href}
+              className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-indigo-500/50 transition-colors block"
+            >
               <div className="text-3xl mb-3">{item.icon}</div>
               <div className="font-bold text-white text-sm mb-1">{item.title}</div>
               <div className="text-xs text-gray-500">{item.desc}</div>
@@ -57,46 +118,37 @@ export default function AdminPage() {
             <h2 className="font-bold text-white">Recent Contact Messages</h2>
             <Link href="/admin/contact" className="text-sm text-indigo-400 hover:underline">View All →</Link>
           </div>
-          <div id="recent-messages">
-            <div className="text-center py-8 text-gray-500 text-sm">Loading messages…</div>
-          </div>
+
+          {loading ? (
+            <div className="text-center py-8 text-gray-500 text-sm animate-pulse">Loading messages…</div>
+          ) : messages.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 text-sm">No unread messages.</div>
+          ) : (
+            <div className="divide-y divide-gray-800">
+              {messages.map(m => (
+                <div key={m.id} className="flex items-start gap-3 py-3">
+                  <div className="w-8 h-8 bg-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400 font-bold text-sm flex-shrink-0">
+                    {m.name[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm text-white">{m.name}</span>
+                      <span className="text-xs text-gray-500">{m.email}</span>
+                      <span className="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                        {m.status}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-400 mt-0.5 truncate">{m.subject}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {new Date(m.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      <script dangerouslySetInnerHTML={{ __html: `
-        async function loadAdminData() {
-          try {
-            const [usersRes, contactRes, blogRes, prodRes] = await Promise.all([
-              fetch('/api/admin/users?limit=1'),
-              fetch('/api/contact?status=unread&limit=5'),
-              fetch('/api/blog/posts?limit=1&status=published'),
-              fetch('/api/products?limit=1'),
-            ]);
-            const [u,c,b,p] = await Promise.all([usersRes.json(),contactRes.json(),blogRes.json(),prodRes.json()]);
-            const stats = document.querySelectorAll('#admin-stats .text-3xl');
-            if(stats[0]) stats[0].textContent = u.total||'0';
-            if(stats[1]) stats[1].textContent = p.total||'0';
-            if(stats[2]) stats[2].textContent = b.total||'0';
-            if(stats[3]) stats[3].textContent = c.statusCounts?.unread||'0';
-            // Recent messages
-            const msgs = document.getElementById('recent-messages');
-            if(c.messages?.length) {
-              msgs.innerHTML = c.messages.map(m =>
-                '<div class="flex items-start gap-3 py-3 border-b border-gray-800 last:border-0">'
-                +'<div class="w-8 h-8 bg-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400 font-bold text-sm flex-shrink-0">'+m.name[0]+'</div>'
-                +'<div class="flex-1 min-w-0">'
-                +'<div class="flex items-center gap-2"><span class="font-semibold text-sm text-white">'+m.name+'</span><span class="text-xs text-gray-500">'+m.email+'</span><span class="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">'+m.status+'</span></div>'
-                +'<div class="text-sm text-gray-400 mt-0.5 truncate">'+m.subject+'</div>'
-                +'<div class="text-xs text-gray-500 mt-1">'+new Date(m.createdAt).toLocaleString()+'</div>'
-                +'</div></div>'
-              ).join('');
-            } else {
-              msgs.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No unread messages.</div>';
-            }
-          } catch(e) { console.error(e); }
-        }
-        loadAdminData();
-      `}} />
     </div>
   )
 }

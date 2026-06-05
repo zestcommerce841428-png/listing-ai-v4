@@ -1,12 +1,41 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
+'use client'
 
-export const metadata: Metadata = {
-  title: 'Contact Us',
-  description: 'Get in touch with the ListingAI team. We reply within 24 hours.',
-}
+import Link from 'next/link'
+import { useState } from 'react'
 
 export default function ContactPage() {
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setForm(v => ({ ...v, [e.target.name]: e.target.value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSending(true)
+    setResult(null)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const d = await res.json()
+      if (d.success) {
+        setResult({ ok: true, msg: d.message ?? 'Message sent successfully!' })
+        setForm({ name: '', email: '', subject: '', message: '' })
+      } else {
+        setResult({ ok: false, msg: d.error ?? 'Failed to send. Please try again.' })
+      }
+    } catch {
+      setResult({ ok: false, msg: 'Network error. Please try again.' })
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <nav className="border-b border-gray-800 px-6 py-4 flex items-center gap-4">
@@ -45,7 +74,7 @@ export default function ContactPage() {
             <div className="mt-10 bg-gray-900 border border-gray-800 rounded-xl p-5">
               <h3 className="font-bold text-white mb-3">🚀 Quick Help</h3>
               <div className="space-y-2 text-sm">
-                <Link href="/blog" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"><span>📚</span> Browse Documentation & Blog</Link>
+                <Link href="/blog" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"><span>📚</span> Browse Documentation &amp; Blog</Link>
                 <Link href="/dashboard/settings" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"><span>⚙️</span> API Key Setup Guide</Link>
                 <Link href="/legal" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"><span>📋</span> Legal Documents</Link>
               </div>
@@ -55,20 +84,31 @@ export default function ContactPage() {
           {/* Contact Form */}
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8">
             <h2 className="text-xl font-bold text-white mb-6">Send us a message</h2>
-            <form id="contact-form" onSubmit={(e) => e.preventDefault()}>
-              <div className="grid grid-cols-2 gap-4 mb-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Name *</label>
-                  <input type="text" name="name" required placeholder="John Smith" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none placeholder-gray-500"/>
+                  <input
+                    type="text" name="name" required value={form.name} onChange={handleChange}
+                    placeholder="John Smith"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Email *</label>
-                  <input type="email" name="email" required placeholder="you@example.com" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none placeholder-gray-500"/>
+                  <input
+                    type="email" name="email" required value={form.email} onChange={handleChange}
+                    placeholder="you@example.com"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+                  />
                 </div>
               </div>
-              <div className="mb-4">
+              <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Subject *</label>
-                <select name="subject" required className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                <select
+                  name="subject" required value={form.subject} onChange={handleChange}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                >
                   <option value="">Select a topic…</option>
                   <option>General Question</option>
                   <option>Technical Support</option>
@@ -79,57 +119,36 @@ export default function ContactPage() {
                   <option>Billing Question</option>
                 </select>
               </div>
-              <div className="mb-6">
+              <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Message *</label>
-                <textarea name="message" required rows={5} placeholder="Describe your question or issue in detail…" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none placeholder-gray-500 resize-none"></textarea>
+                <textarea
+                  name="message" required value={form.message} onChange={handleChange}
+                  rows={5} placeholder="Describe your question or issue in detail…"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none placeholder-gray-500 resize-none"
+                />
               </div>
-              <button type="submit" id="contact-submit" className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl transition-colors text-sm">
-                Send Message
+
+              <button
+                type="submit"
+                disabled={sending}
+                className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors text-sm"
+              >
+                {sending ? 'Sending…' : 'Send Message'}
               </button>
-              <div id="contact-result" className="mt-4 text-sm text-center hidden"></div>
+
+              {result && (
+                <div className={`mt-2 text-sm text-center rounded-lg p-3 ${
+                  result.ok
+                    ? 'text-green-400 bg-green-400/10 border border-green-400/20'
+                    : 'text-red-400 bg-red-400/10 border border-red-400/20'
+                }`}>
+                  {result.ok ? '✅' : '❌'} {result.msg}
+                </div>
+              )}
             </form>
           </div>
         </div>
       </div>
-
-      {/* Client-side form handling */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        document.getElementById('contact-form').addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const btn = document.getElementById('contact-submit');
-          const result = document.getElementById('contact-result');
-          const form = e.target;
-          btn.disabled = true;
-          btn.textContent = 'Sending…';
-          try {
-            const res = await fetch('/api/contact', {
-              method: 'POST',
-              headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({
-                name: form.name.value,
-                email: form.email.value,
-                subject: form.subject.value,
-                message: form.message.value,
-              })
-            });
-            const d = await res.json();
-            if (d.success) {
-              result.className = 'mt-4 text-sm text-center text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg p-3';
-              result.textContent = '✅ ' + d.message;
-              form.reset();
-            } else {
-              result.className = 'mt-4 text-sm text-center text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg p-3';
-              result.textContent = '❌ ' + (d.error || 'Failed to send. Please try again.');
-            }
-          } catch(e) {
-            result.className = 'mt-4 text-sm text-center text-red-400';
-            result.textContent = '❌ Network error. Please try again.';
-          }
-          btn.disabled = false;
-          btn.textContent = 'Send Message';
-          result.classList.remove('hidden');
-        });
-      `}} />
 
       <footer className="border-t border-gray-800 py-8 text-center text-gray-500 text-sm">
         <div className="flex flex-wrap gap-4 justify-center">

@@ -1,0 +1,299 @@
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: listing-ai
+  labels:
+    app: listing-ai
+
+---
+# ConfigMap — non-sensitive env vars
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: listing-ai-config
+  namespace: listing-ai
+data:
+  NODE_ENV: "production"
+  NEXT_PUBLIC_APP_URL: "https://listingai.app"
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in"
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
+  NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "/dashboard"
+  NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: "/dashboard"
+  REDIS_URL: "redis://listing-ai-redis:6379"
+  KAFKA_BROKERS: "listing-ai-kafka:29092"
+  PYTHON_SCRAPER_URL: "http://listing-ai-scraper:5001"
+  AWS_REGION: "us-east-1"
+
+---
+# Secret — sensitive env vars (base64 encoded — replace values before apply)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: listing-ai-secrets
+  namespace: listing-ai
+type: Opaque
+stringData:
+  DATABASE_URL: "mysql://listingai:CHANGE_ME@listing-ai-mysql:3306/listing_ai"
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "CHANGE_ME"
+  CLERK_SECRET_KEY: "CHANGE_ME"
+  GROQ_API_KEY: ""
+  GEMINI_API_KEY: ""
+  OPENAI_API_KEY: ""
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  SUPER_ADMIN_CLERK_ID: "CHANGE_ME"
+  SUPER_ADMIN_EMAIL: "CHANGE_ME"
+
+---
+# MySQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: listing-ai-mysql
+  namespace: listing-ai
+spec:
+  serviceName: listing-ai-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: listing-ai-mysql
+  template:
+    metadata:
+      labels:
+        app: listing-ai-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "rootpass123"
+            - name: MYSQL_DATABASE
+              value: "listing_ai"
+            - name: MYSQL_USER
+              value: "listingai"
+            - name: MYSQL_PASSWORD
+              value: "listingai123"
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+            - --default-authentication-plugin=mysql_native_password
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+
+---
+# MySQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: listing-ai-mysql
+  namespace: listing-ai
+spec:
+  selector:
+    app: listing-ai-mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: listing-ai-redis
+  namespace: listing-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: listing-ai-redis
+  template:
+    metadata:
+      labels:
+        app: listing-ai-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: listing-ai-redis
+  namespace: listing-ai
+spec:
+  selector:
+    app: listing-ai-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+
+---
+# Next.js App Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: listing-ai-app
+  namespace: listing-ai
+  labels:
+    app: listing-ai-app
+    version: latest
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: listing-ai-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: listing-ai-app
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/REPLACE_GITHUB_OWNER/listing-ai-v4:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: listing-ai-config
+            - secretRef:
+                name: listing-ai-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+---
+# App Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: listing-ai-app
+  namespace: listing-ai
+spec:
+  selector:
+    app: listing-ai-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: listing-ai-app-hpa
+  namespace: listing-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: listing-ai-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: listing-ai-ingress
+  namespace: listing-ai
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - listingai.app
+        - www.listingai.app
+      secretName: listing-ai-tls
+  rules:
+    - host: listingai.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: listing-ai-app
+                port:
+                  number: 80
+    - host: www.listingai.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: listing-ai-app
+                port:
+                  number: 80

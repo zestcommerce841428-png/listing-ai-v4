@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import './globals.css'
+import Providers from './providers'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
 
@@ -110,19 +111,9 @@ const jsonLd = {
   ],
 }
 
-const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-const hasValidClerkKey = clerkKey?.startsWith('pk_') && !clerkKey.includes('your_clerk')
-
-function Providers({ children }: { children: React.ReactNode }) {
-  if (hasValidClerkKey) {
-    return <ClerkProvider>{children}</ClerkProvider>
-  }
-  return <>{children}</>
-}
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Providers>
+    <ClerkProvider>
       <html lang="en" className="dark" suppressHydrationWarning>
         <head>
           <script
@@ -133,9 +124,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         </head>
         <body className={`${inter.variable} font-sans antialiased`}>
-          {children}
+          <Providers>{children}</Providers>
         </body>
       </html>
-    </Providers>
+    </ClerkProvider>
   )
 }
